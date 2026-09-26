@@ -207,20 +207,43 @@ def query_by_acoustic_fingerprint(file_path: Path):
     return None
 
 
-def has_comment_metadata(file_path: Path) -> bool:
-    """Checks if an audio file contains any comment metadata fields."""
+def extract_comment_metadata(file_path: Path) -> list[tuple[str, str]]:
+    """
+    Extracts comment metadata from FLAC (COMMENT/DESCRIPTION/COMMENTS) or MP3 (COMM frames).
+    Returns a list of (field_name, comment_text) tuples.
+    """
     ext = file_path.suffix.lower()
+    comments: list[tuple[str, str]] = []
     try:
         if ext == ".flac":
             audio = FLAC(file_path)
-            return any(k.upper() in {"COMMENT", "DESCRIPTION", "COMMENTS"} for k in audio.keys())
+            for k in audio.keys():
+                if k.upper() in {"COMMENT", "DESCRIPTION", "COMMENTS"}:
+                    vals = audio.get(k, [])
+                    if isinstance(vals, list):
+                        for val in vals:
+                            comments.append((k.upper(), str(val)))
+                    elif vals:
+                        comments.append((k.upper(), str(vals)))
         elif ext == ".mp3":
             audio = MP3(file_path)
             if audio.tags:
-                return any(k.startswith("COMM") for k in audio.tags.keys())
+                for k in audio.tags.keys():
+                    if k.startswith("COMM"):
+                        frame = audio.tags[k]
+                        text = "\n".join(frame.text) if hasattr(frame, "text") and frame.text else str(frame)
+                        field_name = "COMMENT"
+                        if hasattr(frame, "desc") and frame.desc and frame.desc != "ID3v1 Comment":
+                            field_name = f"COMMENT ({frame.desc})"
+                        comments.append((field_name, text))
     except Exception:
         pass
-    return False
+    return comments
+
+
+def has_comment_metadata(file_path: Path) -> bool:
+    """Checks if an audio file contains any comment metadata fields."""
+    return bool(extract_comment_metadata(file_path))
 
 
 def remove_comment_metadata(target_path: Path) -> bool:
@@ -287,17 +310,36 @@ def evaluate_tag_update_status(
     new_metadata: dict | None,
     remove_comments: bool,
     has_comments: bool,
-) -> tuple[bool, bool, bool, bool, list[str], list[tuple[str, str, str]], list[tuple[str, str]]]:
+    existing_comments: list[tuple[str, str]] | None = None,
+) -> tuple[
+    bool,
+    bool,
+    bool,
+    bool,
+    list[str],
+    list[tuple[str, str, str]],
+    list[tuple[str, str]],
+    list[tuple[str, str]],
+]:
     """
     Compares existing tags with proposed updates to classify update status:
       1) all_updated: all incoming non-empty metadata fields differ from existing.
       2) partially_updated: some incoming fields differ and some already match existing values.
       3) no_changes: all incoming fields match existing values.
       4) fields_removed: comment metadata was removed.
-    Returns: (is_all_updated, is_partially_updated, is_no_changes, is_fields_removed, status_descriptions, updated_fields_detail, unchanged_fields_detail)
+    Returns: (is_all_updated, is_partially_updated, is_no_changes, is_fields_removed, status_descriptions, updated_fields_detail, unchanged_fields_detail, removed_fields_detail)
     """
     is_fields_removed = remove_comments and has_comments
     existing = inspect_existing_tags(file_path)
+
+    removed_fields_detail: list[tuple[str, str]] = []
+    if is_fields_removed:
+        if existing_comments is not None:
+            removed_fields_detail = list(existing_comments)
+        else:
+            removed_fields_detail = extract_comment_metadata(file_path)
+        if not removed_fields_detail:
+            removed_fields_detail = [("COMMENT", "")]
 
     if not new_metadata:
         status_descs = []
@@ -306,7 +348,16 @@ def evaluate_tag_update_status(
         else:
             status_descs.append("Unmatched / Untouched")
         existing_unchanged = [(k, v) for k, v in existing.items() if v]
-        return False, False, False, is_fields_removed, status_descs, [], existing_unchanged
+        return (
+            False,
+            False,
+            False,
+            is_fields_removed,
+            status_descs,
+            [],
+            existing_unchanged,
+            removed_fields_detail,
+        )
 
     ext = file_path.suffix.lower()
 
@@ -360,7 +411,16 @@ def evaluate_tag_update_status(
     if is_fields_removed:
         status_descs.append("Some fields removed")
 
-    return is_all_updated, is_partially_updated, is_no_changes, is_fields_removed, status_descs, updated_fields_detail, unchanged_fields_detail
+    return (
+        is_all_updated,
+        is_partially_updated,
+        is_no_changes,
+        is_fields_removed,
+        status_descs,
+        updated_fields_detail,
+        unchanged_fields_detail,
+        removed_fields_detail,
+    )
 
 
 def write_flac_tags(target_path: Path, metadata: dict, remove_comments: bool = False):
@@ -515,7 +575,8 @@ def process_files(
         method_used = None
 
         # Check existing comment status before any modification
-        file_has_comments = has_comment_metadata(src_file)
+        existing_comments = extract_comment_metadata(src_file)
+        file_has_comments = bool(existing_comments)
 
         # ------------------------------------------------------------------
         # Step 1: Text-Based Match (Priority 1)
@@ -539,8 +600,8 @@ def process_files(
         # ------------------------------------------------------------------
         # Evaluate Update Status for Statistics
         # ------------------------------------------------------------------
-        all_up, part_up, no_chg, rem_fld, status_descs, updated_detail, unchanged_detail = evaluate_tag_update_status(
-            src_file, metadata, remove_comments, file_has_comments
+        all_up, part_up, no_chg, rem_fld, status_descs, updated_detail, unchanged_detail, removed_detail = evaluate_tag_update_status(
+            src_file, metadata, remove_comments, file_has_comments, existing_comments
         )
         if all_up:
             stats["all_updated"] += 1
@@ -609,7 +670,10 @@ def process_files(
 
             if remove_comments and file_has_comments:
                 print("  Removed fields:")
-                print("    - COMMENT: <present> -> <removed>")
+                for field, val in removed_detail:
+                    cleaned_val = val.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
+                    old_display = f"'{cleaned_val}'" if cleaned_val else "<empty>"
+                    print(f"    - {field}: {old_display} -> <removed>")
         print(
             f"[Running Stats] All updated: {stats['all_updated']} | "
             f"Partially updated: {stats['partially_updated']} | "

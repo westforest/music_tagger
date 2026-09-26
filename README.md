@@ -239,7 +239,7 @@ During execution, `tagger.py` prints running statistics after each file is proce
     - MUSICBRAINZ_TRACKID: <empty> -> 'b0a70f5e-149b-4bf1-893d-4c3e8006e897'
   Unchanged tags: None
   Removed fields:
-    - COMMENT: <present> -> <removed>
+    - COMMENT: 'Ripped by EAC' -> <removed>
 [Running Stats] All updated: 1 | Partially updated: 0 | No changes: 0 | Fields removed: 1 (1/2)
 
 [2/2] 02 - Queen - Another One Bites the Dust.mp3
