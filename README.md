@@ -20,11 +20,28 @@ A CLI tool for batch tagging audio files (**FLAC** and **MP3**) using a hybrid l
 ## Prerequisites
 
 ### 1. Python 3.8+
-Make sure Python 3 and `pip` are installed on your system.
+Make sure Python 3 and `pip` are installed on your system:
+- **Windows**: Download from [python.org](https://www.python.org/downloads/) (check **"Add python.exe to PATH"** during setup) or install via `winget install Python.Python.3.11`.
+- **Linux / macOS**: Preinstalled or available via your distribution's package manager.
 
 ### 2. Chromaprint (`fpcalc`)
 The acoustic fingerprinting fallback requires the `fpcalc` CLI binary from Chromaprint:
 
+- **Windows**:
+  - **Option A (Package Managers)**:
+    ```powershell
+    # Via Winget
+    winget install AcoustID.Chromaprint
+
+    # Or via Chocolatey
+    choco install chromaprint
+
+    # Or via Scoop
+    scoop install fpcalc
+    ```
+  - **Option B (Direct Download — No Admin Required)**:
+    1. Download the Windows release archive (`chromaprint-fpcalc-*.zip`) from the [Chromaprint Releases](https://github.com/acoustid/chromaprint/releases) or [AcoustID.org](https://acoustid.org/chromaprint).
+    2. Extract `fpcalc.exe` and place it directly inside the `music_tagger` repository folder (the script automatically checks for `fpcalc.exe` in the script directory), or place it in any directory in your system `PATH`.
 - **Debian / Ubuntu / Raspberry Pi OS**:
   ```bash
   sudo apt update
@@ -47,13 +64,14 @@ The acoustic fingerprinting fallback requires the `fpcalc` CLI binary from Chrom
 
 ## Installation
 
+### Linux & macOS
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/westforest/music_tagger.git
    cd music_tagger
    ```
 
-2. **Create and activate a virtual environment** (recommended):
+2. **Create and activate a virtual environment**:
    ```bash
    python3 -m venv venv
    source venv/bin/activate
@@ -61,6 +79,34 @@ The acoustic fingerprinting fallback requires the `fpcalc` CLI binary from Chrom
 
 3. **Install dependencies**:
    ```bash
+   pip install -r requirements.txt
+   ```
+
+### Windows (PowerShell or Command Prompt)
+1. **Clone the repository** (or download and extract the ZIP):
+   ```powershell
+   git clone https://github.com/westforest/music_tagger.git
+   cd music_tagger
+   ```
+
+2. **Create a virtual environment**:
+   ```powershell
+   python -m venv venv
+   ```
+
+3. **Activate the virtual environment**:
+   - **PowerShell**:
+     ```powershell
+     .\venv\Scripts\Activate.ps1
+     ```
+     *(If PowerShell blocks script execution, run: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`)*
+   - **Command Prompt (`cmd.exe`)**:
+     ```cmd
+     .\venv\Scripts\activate.bat
+     ```
+
+4. **Install dependencies**:
+   ```powershell
    pip install -r requirements.txt
    ```
 
@@ -135,6 +181,24 @@ Scan only the top-level directory without descending into subfolders:
 #### 7. Specifying Individual Files or Mixed Sources
 ```bash
 ./tagger.py song1.flac "album2/*.mp3" /path/to/album3
+```
+
+### Windows Command Examples (PowerShell & CMD)
+
+On Windows, invoke the script using `python tagger.py` (or `py tagger.py`):
+
+```powershell
+# Tag an entire music folder recursively in-place
+python tagger.py "C:\Users\YourName\Music\AlbumName"
+
+# Dry-run preview on a folder without modifying files
+python tagger.py --dry-run "D:\Music\Downloads"
+
+# Tag all MP3 files matching a pattern and copy them to a destination directory
+python tagger.py -o "D:\Music\Tagged" "D:\Music\Incoming\*.mp3"
+
+# Tag multiple folders using wildcards
+python tagger.py "D:\Music\Albums\*"
 ```
 
 ---

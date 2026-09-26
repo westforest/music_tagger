@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import sys
 import os
 import re
 import glob
@@ -7,6 +8,22 @@ import argparse
 import time
 import warnings
 from pathlib import Path
+
+# Ensure UTF-8 console output on Windows terminals
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+# On Windows or portable setups, detect fpcalc executable if placed in script folder
+if not os.environ.get("FPCALC") and not shutil.which("fpcalc") and not shutil.which("fpcalc.exe"):
+    script_dir = Path(__file__).resolve().parent
+    for candidate in ("fpcalc.exe", "fpcalc"):
+        local_fpcalc = script_dir / candidate
+        if local_fpcalc.is_file():
+            os.environ["FPCALC"] = str(local_fpcalc)
+            break
 
 # Suppress requests urllib3/chardet mismatch warning if present
 warnings.filterwarnings("ignore", category=Warning, module="requests")
@@ -296,11 +313,13 @@ def resolve_audio_files(sources, recursive: bool = True) -> list[Path]:
     unique_files: list[Path] = []
     for file_path in candidate_files:
         try:
-            canonical = file_path.resolve()
+            resolved = file_path.resolve()
         except Exception:
-            canonical = file_path.absolute()
-        if canonical not in seen:
-            seen.add(canonical)
+            resolved = file_path.absolute()
+        # On Windows, path comparisons should be case-insensitive
+        key = str(resolved).lower() if sys.platform == "win32" else str(resolved)
+        if key not in seen:
+            seen.add(key)
             unique_files.append(file_path)
 
     return unique_files
