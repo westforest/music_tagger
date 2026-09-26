@@ -287,16 +287,17 @@ def evaluate_tag_update_status(
     new_metadata: dict | None,
     remove_comments: bool,
     has_comments: bool,
-) -> tuple[bool, bool, bool, bool, list[str], list[tuple[str, str, str]]]:
+) -> tuple[bool, bool, bool, bool, list[str], list[tuple[str, str, str]], list[tuple[str, str]]]:
     """
     Compares existing tags with proposed updates to classify update status:
       1) all_updated: all incoming non-empty metadata fields differ from existing.
       2) partially_updated: some incoming fields differ and some already match existing values.
       3) no_changes: all incoming fields match existing values.
       4) fields_removed: comment metadata was removed.
-    Returns: (is_all_updated, is_partially_updated, is_no_changes, is_fields_removed, status_descriptions, updated_fields_detail)
+    Returns: (is_all_updated, is_partially_updated, is_no_changes, is_fields_removed, status_descriptions, updated_fields_detail, unchanged_fields_detail)
     """
     is_fields_removed = remove_comments and has_comments
+    existing = inspect_existing_tags(file_path)
 
     if not new_metadata:
         status_descs = []
@@ -304,9 +305,9 @@ def evaluate_tag_update_status(
             status_descs.append("Some fields removed")
         else:
             status_descs.append("Unmatched / Untouched")
-        return False, False, False, is_fields_removed, status_descs, []
+        existing_unchanged = [(k, v) for k, v in existing.items() if v]
+        return False, False, False, is_fields_removed, status_descs, [], existing_unchanged
 
-    existing = inspect_existing_tags(file_path)
     ext = file_path.suffix.lower()
 
     fields_to_check: dict[str, str] = {}
@@ -329,14 +330,20 @@ def evaluate_tag_update_status(
     updated_count = 0
     same_count = 0
     updated_fields_detail: list[tuple[str, str, str]] = []
+    unchanged_fields_detail: list[tuple[str, str]] = []
 
     for field, new_val in fields_to_check.items():
         old_val = existing.get(field, "").strip()
         if old_val == new_val:
             same_count += 1
+            unchanged_fields_detail.append((field, old_val))
         else:
             updated_count += 1
             updated_fields_detail.append((field, old_val, new_val))
+
+    for field, old_val in existing.items():
+        if old_val and field not in fields_to_check:
+            unchanged_fields_detail.append((field, old_val))
 
     is_all_updated = (updated_count > 0 and same_count == 0)
     is_partially_updated = (updated_count > 0 and same_count > 0)
@@ -353,7 +360,7 @@ def evaluate_tag_update_status(
     if is_fields_removed:
         status_descs.append("Some fields removed")
 
-    return is_all_updated, is_partially_updated, is_no_changes, is_fields_removed, status_descs, updated_fields_detail
+    return is_all_updated, is_partially_updated, is_no_changes, is_fields_removed, status_descs, updated_fields_detail, unchanged_fields_detail
 
 
 def write_flac_tags(target_path: Path, metadata: dict, remove_comments: bool = False):
@@ -532,7 +539,7 @@ def process_files(
         # ------------------------------------------------------------------
         # Evaluate Update Status for Statistics
         # ------------------------------------------------------------------
-        all_up, part_up, no_chg, rem_fld, status_descs, updated_detail = evaluate_tag_update_status(
+        all_up, part_up, no_chg, rem_fld, status_descs, updated_detail, unchanged_detail = evaluate_tag_update_status(
             src_file, metadata, remove_comments, file_has_comments
         )
         if all_up:
@@ -591,8 +598,17 @@ def process_files(
                     old_display = f"'{old_val}'" if old_val else "<empty>"
                     print(f"    - {field}: {old_display} -> '{new_val}'")
             elif metadata:
-                print("  Updated tags: None (all incoming values matched existing)")
+                print("  Updated tags: None")
+
+            if unchanged_detail:
+                print("  Unchanged tags:")
+                for field, val in unchanged_detail:
+                    print(f"    - {field}: '{val}'")
+            elif metadata:
+                print("  Unchanged tags: None")
+
             if remove_comments and file_has_comments:
+                print("  Removed fields:")
                 print("    - COMMENT: <present> -> <removed>")
         print(
             f"[Running Stats] All updated: {stats['all_updated']} | "

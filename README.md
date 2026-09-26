@@ -237,6 +237,8 @@ During execution, `tagger.py` prints running statistics after each file is proce
     - TRACKNUMBER: <empty> -> '11'
     - TRACKTOTAL: <empty> -> '12'
     - MUSICBRAINZ_TRACKID: <empty> -> 'b0a70f5e-149b-4bf1-893d-4c3e8006e897'
+  Unchanged tags: None
+  Removed fields:
     - COMMENT: <present> -> <removed>
 [Running Stats] All updated: 1 | Partially updated: 0 | No changes: 0 | Fields removed: 1 (1/2)
 
@@ -248,6 +250,9 @@ During execution, `tagger.py` prints running statistics after each file is proce
     - ALBUM: 'Greatest Hits' -> 'The Game'
     - DATE: '1981' -> '1980'
     - TRACKNUMBER: '3' -> '3/10'
+  Unchanged tags:
+    - TITLE: 'Another One Bites the Dust'
+    - ARTIST: 'Queen'
 [Running Stats] All updated: 1 | Partially updated: 1 | No changes: 0 | Fields removed: 1 (2/2)
 
 ============================================================
