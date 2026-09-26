@@ -287,14 +287,14 @@ def evaluate_tag_update_status(
     new_metadata: dict | None,
     remove_comments: bool,
     has_comments: bool,
-) -> tuple[bool, bool, bool, bool, list[str]]:
+) -> tuple[bool, bool, bool, bool, list[str], list[tuple[str, str, str]]]:
     """
     Compares existing tags with proposed updates to classify update status:
       1) all_updated: all incoming non-empty metadata fields differ from existing.
       2) partially_updated: some incoming fields differ and some already match existing values.
       3) no_changes: all incoming fields match existing values.
       4) fields_removed: comment metadata was removed.
-    Returns: (is_all_updated, is_partially_updated, is_no_changes, is_fields_removed, status_descriptions)
+    Returns: (is_all_updated, is_partially_updated, is_no_changes, is_fields_removed, status_descriptions, updated_fields_detail)
     """
     is_fields_removed = remove_comments and has_comments
 
@@ -304,7 +304,7 @@ def evaluate_tag_update_status(
             status_descs.append("Some fields removed")
         else:
             status_descs.append("Unmatched / Untouched")
-        return False, False, False, is_fields_removed, status_descs
+        return False, False, False, is_fields_removed, status_descs, []
 
     existing = inspect_existing_tags(file_path)
     ext = file_path.suffix.lower()
@@ -328,6 +328,7 @@ def evaluate_tag_update_status(
 
     updated_count = 0
     same_count = 0
+    updated_fields_detail: list[tuple[str, str, str]] = []
 
     for field, new_val in fields_to_check.items():
         old_val = existing.get(field, "").strip()
@@ -335,6 +336,7 @@ def evaluate_tag_update_status(
             same_count += 1
         else:
             updated_count += 1
+            updated_fields_detail.append((field, old_val, new_val))
 
     is_all_updated = (updated_count > 0 and same_count == 0)
     is_partially_updated = (updated_count > 0 and same_count > 0)
@@ -351,7 +353,7 @@ def evaluate_tag_update_status(
     if is_fields_removed:
         status_descs.append("Some fields removed")
 
-    return is_all_updated, is_partially_updated, is_no_changes, is_fields_removed, status_descs
+    return is_all_updated, is_partially_updated, is_no_changes, is_fields_removed, status_descs, updated_fields_detail
 
 
 def write_flac_tags(target_path: Path, metadata: dict, remove_comments: bool = False):
@@ -483,6 +485,7 @@ def process_files(
     dry_run: bool = False,
     recursive: bool = True,
     remove_comments: bool = False,
+    verbose: bool = False,
 ):
     audio_files = resolve_audio_files(sources, recursive=recursive)
     if not audio_files:
@@ -529,7 +532,7 @@ def process_files(
         # ------------------------------------------------------------------
         # Evaluate Update Status for Statistics
         # ------------------------------------------------------------------
-        all_up, part_up, no_chg, rem_fld, status_descs = evaluate_tag_update_status(
+        all_up, part_up, no_chg, rem_fld, status_descs, updated_detail = evaluate_tag_update_status(
             src_file, metadata, remove_comments, file_has_comments
         )
         if all_up:
@@ -578,11 +581,21 @@ def process_files(
                 write_audio_tags(target, metadata, remove_comments=remove_comments)
                 print("  Tags updated.")
 
-        # Display update status and running stats after each file
+        # Display update status, verbose tag diffs, and running stats after each file
         status_line = ", ".join(status_descs) if status_descs else "No update"
         print(f"  Status: [{status_line}]")
+        if verbose:
+            if updated_detail:
+                print("  Updated tags:")
+                for field, old_val, new_val in updated_detail:
+                    old_display = f"'{old_val}'" if old_val else "<empty>"
+                    print(f"    - {field}: {old_display} -> '{new_val}'")
+            elif metadata:
+                print("  Updated tags: None (all incoming values matched existing)")
+            if remove_comments and file_has_comments:
+                print("    - COMMENT: <present> -> <removed>")
         print(
-            f"  [Running Stats] All updated: {stats['all_updated']} | "
+            f"[Running Stats] All updated: {stats['all_updated']} | "
             f"Partially updated: {stats['partially_updated']} | "
             f"No changes: {stats['no_changes']} | "
             f"Fields removed: {stats['fields_removed']} ({idx}/{len(audio_files)})\n"
@@ -626,6 +639,11 @@ def main():
         help="Remove all comment metadata fields (Vorbis COMMENT/DESCRIPTION, ID3 COMM frames)."
     )
     parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Print details on what tags and values get updated."
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Simulate lookups without modifying or copying files."
@@ -639,6 +657,7 @@ def main():
         dry_run=args.dry_run,
         recursive=args.recursive,
         remove_comments=args.remove_comments,
+        verbose=args.verbose,
     )
 
 

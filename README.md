@@ -116,7 +116,7 @@ The acoustic fingerprinting fallback requires the `fpcalc` CLI binary from Chrom
 
 ```text
 usage: tagger.py [-h] [-o OUTPUT] [-r | --recursive | --no-recursive]
-                 [--remove-comments] [--dry-run]
+                 [--remove-comments] [-v] [--dry-run]
                  source [source ...]
 
 Batch tag audio files (FLAC, MP3) using text lookup first, falling back to
@@ -132,6 +132,7 @@ options:
   -r, --recursive, --no-recursive
                         Search directories and dir patterns recursively for audio files (default: True).
   --remove-comments     Remove all comment metadata fields (Vorbis COMMENT/DESCRIPTION, ID3 COMM frames).
+  -v, --verbose         Print details on what tags and values get updated.
   --dry-run             Simulate lookups without modifying or copying files.
 ```
 
@@ -222,19 +223,32 @@ During execution, `tagger.py` prints running statistics after each file is proce
 3. **No changes**: All incoming update values are identical to existing fields.
 4. **Some fields removed**: Comment metadata was removed (via `--remove-comments`).
 
-#### Output Example:
+#### Output Example (with `-v / --verbose`):
 ```text
 [1/2] 01 - Queen - Bohemian Rhapsody.flac
   Matched via [Text Search]: Queen - Bohemian Rhapsody [A Night at the Opera]
   Tags updated.
   Status: [All metadata fields updated, Some fields removed]
-  [Running Stats] All updated: 1 | Partially updated: 0 | No changes: 0 | Fields removed: 1 (1/2)
+  Updated tags:
+    - TITLE: <empty> -> 'Bohemian Rhapsody'
+    - ARTIST: <empty> -> 'Queen'
+    - ALBUM: <empty> -> 'A Night at the Opera'
+    - DATE: <empty> -> '1975'
+    - TRACKNUMBER: <empty> -> '11'
+    - TRACKTOTAL: <empty> -> '12'
+    - MUSICBRAINZ_TRACKID: <empty> -> 'b0a70f5e-149b-4bf1-893d-4c3e8006e897'
+    - COMMENT: <present> -> <removed>
+[Running Stats] All updated: 1 | Partially updated: 0 | No changes: 0 | Fields removed: 1 (1/2)
 
 [2/2] 02 - Queen - Another One Bites the Dust.mp3
   Matched via [Text Search]: Queen - Another One Bites the Dust [The Game]
   Tags updated.
   Status: [Partially updated]
-  [Running Stats] All updated: 1 | Partially updated: 1 | No changes: 0 | Fields removed: 1 (2/2)
+  Updated tags:
+    - ALBUM: 'Greatest Hits' -> 'The Game'
+    - DATE: '1981' -> '1980'
+    - TRACKNUMBER: '3' -> '3/10'
+[Running Stats] All updated: 1 | Partially updated: 1 | No changes: 0 | Fields removed: 1 (2/2)
 
 ============================================================
 Update Statistics Summary (2 files processed)
