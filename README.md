@@ -116,7 +116,7 @@ The acoustic fingerprinting fallback requires the `fpcalc` CLI binary from Chrom
 
 ```text
 usage: tagger.py [-h] [-o OUTPUT] [-r | --recursive | --no-recursive]
-                 [--dry-run]
+                 [--remove-comments] [--dry-run]
                  source [source ...]
 
 Batch tag audio files (FLAC, MP3) using text lookup first, falling back to
@@ -131,6 +131,7 @@ options:
                         Destination directory. If omitted, tags are updated in-place.
   -r, --recursive, --no-recursive
                         Search directories and dir patterns recursively for audio files (default: True).
+  --remove-comments     Remove all comment metadata fields (Vorbis COMMENT/DESCRIPTION, ID3 COMM frames).
   --dry-run             Simulate lookups without modifying or copying files.
 ```
 
@@ -149,19 +150,25 @@ Tag all audio files under every matched artist or album folder:
 ./tagger.py "albums/*"
 ```
 
-#### 3. Dry-Run Simulation (No Files Modified)
-Preview metadata matches before committing changes:
+#### 3. Stripping Comment Metadata
+Removes all Vorbis `COMMENT`/`DESCRIPTION` tags from FLAC files and `COMM` frames from MP3 files:
+```bash
+./tagger.py --remove-comments /path/to/album
+```
+
+#### 4. Dry-Run Simulation (No Files Modified)
+Preview metadata matches and status statistics before committing changes:
 ```bash
 ./tagger.py --dry-run /path/to/album
 ```
 
-#### 4. Copy Tagged Files to an Output Directory
+#### 5. Copy Tagged Files to an Output Directory
 Leave originals untouched and write tagged copies to a new folder:
 ```bash
 ./tagger.py -o /path/to/sorted_music /path/to/album
 ```
 
-#### 5. Using File Patterns (Globbing)
+#### 6. Using File Patterns (Globbing)
 Process all MP3 files in the current folder:
 ```bash
 ./tagger.py "*.mp3"
@@ -172,13 +179,13 @@ Process all FLAC files recursively across nested directories:
 ./tagger.py "**/*.flac"
 ```
 
-#### 6. Disabling Recursive Traversal (Top-Level Only)
+#### 7. Disabling Recursive Traversal (Top-Level Only)
 Scan only the top-level directory without descending into subfolders:
 ```bash
 ./tagger.py --no-recursive /path/to/music_collection
 ```
 
-#### 7. Specifying Individual Files or Mixed Sources
+#### 8. Specifying Individual Files or Mixed Sources
 ```bash
 ./tagger.py song1.flac "album2/*.mp3" /path/to/album3
 ```
@@ -191,6 +198,9 @@ On Windows, invoke the script using `python tagger.py` (or `py tagger.py`):
 # Tag an entire music folder recursively in-place
 python tagger.py "C:\Users\YourName\Music\AlbumName"
 
+# Tag and strip comments
+python tagger.py --remove-comments "C:\Users\YourName\Music\AlbumName"
+
 # Dry-run preview on a folder without modifying files
 python tagger.py --dry-run "D:\Music\Downloads"
 
@@ -199,6 +209,41 @@ python tagger.py -o "D:\Music\Tagged" "D:\Music\Incoming\*.mp3"
 
 # Tag multiple folders using wildcards
 python tagger.py "D:\Music\Albums\*"
+```
+
+---
+
+## Update Statistics & Progress Tracking
+
+During execution, `tagger.py` prints running statistics after each file is processed, followed by a final summary report across 4 non-exclusive categories:
+
+1. **All metadata fields updated**: Every incoming non-empty metadata field differs from existing values (including empty $\to$ populated updates).
+2. **Partially updated**: Some incoming fields differ while other existing fields already match the update values.
+3. **No changes**: All incoming update values are identical to existing fields.
+4. **Some fields removed**: Comment metadata was removed (via `--remove-comments`).
+
+#### Output Example:
+```text
+[1/2] 01 - Queen - Bohemian Rhapsody.flac
+  Matched via [Text Search]: Queen - Bohemian Rhapsody [A Night at the Opera]
+  Tags updated.
+  Status: [All metadata fields updated, Some fields removed]
+  [Running Stats] All updated: 1 | Partially updated: 0 | No changes: 0 | Fields removed: 1 (1/2)
+
+[2/2] 02 - Queen - Another One Bites the Dust.mp3
+  Matched via [Text Search]: Queen - Another One Bites the Dust [The Game]
+  Tags updated.
+  Status: [Partially updated]
+  [Running Stats] All updated: 1 | Partially updated: 1 | No changes: 0 | Fields removed: 1 (2/2)
+
+============================================================
+Update Statistics Summary (2 files processed)
+------------------------------------------------------------
+  1) All metadata fields updated: 1
+  2) Partially updated:           1
+  3) No changes:                  0
+  4) Some fields removed:         1
+============================================================
 ```
 
 ---
