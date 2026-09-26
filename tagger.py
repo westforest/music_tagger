@@ -239,9 +239,28 @@ def write_audio_tags(target_path: Path, metadata: dict):
         raise ValueError(f"Unsupported audio format: {target_path.suffix}")
 
 
-def resolve_audio_files(sources) -> list[Path]:
+def _scan_directory(dir_path: Path, recursive: bool = True) -> list[Path]:
+    """Scans a directory for supported audio files, optionally recurring into subdirectories."""
+    files: list[Path] = []
+    iterator = dir_path.rglob("*") if recursive else dir_path.iterdir()
+    for child in sorted(iterator):
+        # Ignore hidden files and directories (e.g. .git, .cache)
+        try:
+            rel_parts = child.relative_to(dir_path).parts
+            if any(part.startswith(".") for part in rel_parts):
+                continue
+        except ValueError:
+            pass
+
+        if child.is_file() and child.suffix.lower() in SUPPORTED_EXTENSIONS:
+            files.append(child)
+    return files
+
+
+def resolve_audio_files(sources, recursive: bool = True) -> list[Path]:
     """
     Resolves directories, file paths, or glob patterns into a sorted list of unique audio files.
+    When directories or directory patterns are encountered, traverses them recursively if recursive is True.
     """
     if isinstance(sources, (str, Path)):
         sources = [sources]
@@ -254,9 +273,7 @@ def resolve_audio_files(sources) -> list[Path]:
 
         if path_obj.exists():
             if path_obj.is_dir():
-                for child in sorted(path_obj.iterdir()):
-                    if child.is_file() and child.suffix.lower() in SUPPORTED_EXTENSIONS:
-                        candidate_files.append(child)
+                candidate_files.extend(_scan_directory(path_obj, recursive=recursive))
             elif path_obj.is_file():
                 if path_obj.suffix.lower() in SUPPORTED_EXTENSIONS:
                     candidate_files.append(path_obj)
@@ -271,9 +288,7 @@ def resolve_audio_files(sources) -> list[Path]:
                     if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS:
                         candidate_files.append(p)
                     elif p.is_dir():
-                        for child in sorted(p.iterdir()):
-                            if child.is_file() and child.suffix.lower() in SUPPORTED_EXTENSIONS:
-                                candidate_files.append(child)
+                        candidate_files.extend(_scan_directory(p, recursive=recursive))
             else:
                 print(f"  [!] No files or directories found matching: {src_str}")
 
@@ -291,8 +306,8 @@ def resolve_audio_files(sources) -> list[Path]:
     return unique_files
 
 
-def process_files(sources, output_dir: Path = None, dry_run: bool = False):
-    audio_files = resolve_audio_files(sources)
+def process_files(sources, output_dir: Path = None, dry_run: bool = False, recursive: bool = True):
+    audio_files = resolve_audio_files(sources, recursive=recursive)
     if not audio_files:
         ext_list = ", ".join(sorted(SUPPORTED_EXTENSIONS))
         print(f"No supported audio files ({ext_list}) found.")
@@ -372,6 +387,12 @@ def main():
         help="Destination directory. If omitted, tags are updated in-place."
     )
     parser.add_argument(
+        "-r", "--recursive",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Search directories and dir patterns recursively for audio files (default: True)."
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Simulate lookups without modifying or copying files."
@@ -379,7 +400,7 @@ def main():
 
     args = parser.parse_args()
 
-    process_files(args.source, args.output, dry_run=args.dry_run)
+    process_files(args.source, args.output, dry_run=args.dry_run, recursive=args.recursive)
 
 
 if __name__ == "__main__":

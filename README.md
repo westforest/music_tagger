@@ -69,7 +69,9 @@ The acoustic fingerprinting fallback requires the `fpcalc` CLI binary from Chrom
 ## Usage
 
 ```text
-usage: tagger.py [-h] [-o OUTPUT] [--dry-run] source [source ...]
+usage: tagger.py [-h] [-o OUTPUT] [-r | --recursive | --no-recursive]
+                 [--dry-run]
+                 source [source ...]
 
 Batch tag audio files (FLAC, MP3) using text lookup first, falling back to
 acoustic fingerprinting.
@@ -81,29 +83,39 @@ options:
   -h, --help            show this help message and exit
   -o OUTPUT, --output OUTPUT
                         Destination directory. If omitted, tags are updated in-place.
+  -r, --recursive, --no-recursive
+                        Search directories and dir patterns recursively for audio files (default: True).
   --dry-run             Simulate lookups without modifying or copying files.
 ```
 
 ### Examples
 
-#### 1. Tag an Entire Album Directory (In-Place)
+#### 1. Tag an Entire Album or Library Directory (Recursive by Default)
+Traverses the specified directory and all nested subdirectories:
 ```bash
-./tagger.py /path/to/album
+./tagger.py /path/to/music_collection
 ```
 
-#### 2. Dry-Run Simulation (No Files Modified)
+#### 2. Using Directory Patterns (Recursive Expansion)
+Tag all audio files under every matched artist or album folder:
+```bash
+./tagger.py "music/Artist*"
+./tagger.py "albums/*"
+```
+
+#### 3. Dry-Run Simulation (No Files Modified)
 Preview metadata matches before committing changes:
 ```bash
 ./tagger.py --dry-run /path/to/album
 ```
 
-#### 3. Copy Tagged Files to an Output Directory
+#### 4. Copy Tagged Files to an Output Directory
 Leave originals untouched and write tagged copies to a new folder:
 ```bash
 ./tagger.py -o /path/to/sorted_music /path/to/album
 ```
 
-#### 4. Using File Patterns (Globbing)
+#### 5. Using File Patterns (Globbing)
 Process all MP3 files in the current folder:
 ```bash
 ./tagger.py "*.mp3"
@@ -114,7 +126,13 @@ Process all FLAC files recursively across nested directories:
 ./tagger.py "**/*.flac"
 ```
 
-#### 5. Specifying Individual Files or Mixed Sources
+#### 6. Disabling Recursive Traversal (Top-Level Only)
+Scan only the top-level directory without descending into subfolders:
+```bash
+./tagger.py --no-recursive /path/to/music_collection
+```
+
+#### 7. Specifying Individual Files or Mixed Sources
 ```bash
 ./tagger.py song1.flac "album2/*.mp3" /path/to/album3
 ```
